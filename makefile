@@ -5,17 +5,17 @@ KEY_NAME := aws_login_1  # Replace with your key pair name
 
 VPC_NAME := test vpc
 VPC_CIDR := 10.0.0.0/16
-VPC_ID := vpc-0da3c5a115e5232c7
+VPC_ID := vpc-03427942ac95ed851
 
 PUBLIC_SUBNET_NAME := subnet-pub
 PUBLIC_SUBNET_CIDR := 10.0.1.0/24
-PUBLIC_SUBNET_ID := subnet-0fc2c6e8acb1a4a59
+PUBLIC_SUBNET_ID := subnet-000b3d1e4e2589db0
 
 IGW_NAME := test-igw
-IGW_ID := igw-070cf94c3b08e8bb2
+IGW_ID := igw-0bcaa65f80c06ea98
 
 ROUTE_TABLE_NAME := test-route-table
-ROUTE_TABLE_ID := rtb-0f442fbb9f1d014a5
+ROUTE_TABLE_ID := rtb-019826fa73feb6003
 ROUTE_TABLE_DESTINATION := 0.0.0.0/0
 
 
@@ -47,7 +47,7 @@ create-public-subnet:
 
 NODES_SECURITY_GROUP := test-instance-sg
 SECURITY_GROUP_DESCRIPTION :='This is a security group only for the 3 instances'
-NODES_SECURITY_GROUP_ID := sg-0029ed820e534ea86
+NODES_SECURITY_GROUP_ID := sg-080aa510588914ad8
 
 create-security-group:
 	@ aws ec2 create-security-group --vpc-id $(VPC_ID) --group-name $(NODES_SECURITY_GROUP) --description $(SECURITY_GROUP_DESCRIPTION) --region $(AWS_REGION)
@@ -64,9 +64,9 @@ setup-instance: ## Sets up nodejs version v20.10.0
 	@ chmod +x ./scripts/setup-instance.sh
 	@ ./scripts/setup-instance.sh
 
-INSTANCE_ID_MASTER := i-07d0a9b52f7daa36e
-MASTER_PUBLIC_IP := 54.227.222.197
-MASTER_PRIVATE_IP := 10.0.1.238
+INSTANCE_ID_MASTER := i-043fe4f357370ce84
+MASTER_PUBLIC_IP := 3.239.163.145
+MASTER_PRIVATE_IP := 10.0.1.82
 user := ubuntu
 KEY_PAIR_FILE := ./aws_login_1.pem
 
@@ -79,20 +79,20 @@ get-master-token:
 
 # NOTE: YOU MUST CREATE security group with ssh,http,https rules
 
-WORKER_NODE_1_ID := i-09b80b765a5d7e2af
-WORKER_NODE_1_PUBLIC_IP := 100.26.252.33
-WORKER_NODE_1_PRIVATE_IP := 10.0.1.174
+WORKER_NODE_1_ID := i-03711095d713e119e
+WORKER_NODE_1_PUBLIC_IP := 44.204.215.204
+WORKER_NODE_1_PRIVATE_IP := 10.0.1.89
 
-WORKER_NODE_2_ID := i-09c44c4485d533d57
-WORKER_NODE_2_PUBLIC_IP := 100.25.117.210
-WORKER_NODE_2_PRIVATE_IP := 10.0.1.209
+WORKER_NODE_2_ID := i-0909000848f8ed947
+WORKER_NODE_2_PUBLIC_IP := 44.199.203.64
+WORKER_NODE_2_PRIVATE_IP := 10.0.1.94
 
 NGINX_ID := i-0cb666632f638023d	
 NGINX_PUBLIC_IP := 3.82.26.91
 NGINX_1_PRIVATE_IP := 10.0.1.135
 
 K3S_URL := https://$(MASTER_PRIVATE_IP):6443
-K3S_TOKEN := K10be4d2e14a7b18193fdc82c5cd4c15ab253c55b331849cd29a8df2c505af447b3::server:fc2762f2c8c6486dfe0adc72bb55085e
+K3S_TOKEN := K10487a8c21a73530fa6406c50341173fac51ddea4939dcc94336ad506d6aafd73a::server:ba1765abe579ca3bb2d53f47caac6b67
 
 set-workers:
 	@ ssh -i $(KEY_PAIR_FILE) $(user)@$(WORKER_NODE_1_PUBLIC_IP) 'sudo hostnamectl set-hostname worker-1 && sudo apt update && sudo curl -sfL https://get.k3s.io | K3S_URL=$(K3S_URL) K3S_TOKEN=$(K3S_TOKEN) sh - && sudo apt update'
@@ -110,7 +110,7 @@ deploy-pods:
 
 NGINX_SECURITY_GROUP := nginx-sg
 NGINX_SECURITY_GROUP_DESCRIPTION := 'Security group for nginx'
-NGINX_SG_ID := sg-061b1517c7f92faa6
+NGINX_SG_ID := sg-04d15e93971abe315
 NGINX_NAME := 'nginx'
 create-nginx-sg:
 	@ aws ec2 create-security-group --vpc-id $(VPC_ID) --group-name $(NGINX_SECURITY_GROUP) --description $(NGINX_SECURITY_GROUP_DESCRIPTION) --region $(AWS_REGION)
@@ -124,12 +124,12 @@ configure-nginx-sg:
 create-nginx-instance:
 	@ aws ec2 run-instances --image-id $(AMI_ID) --count 1 --instance-type $(INSTANCE_TYPE) --key-name $(KEY_NAME) --subnet-id $(PUBLIC_SUBNET_ID) --security-group-ids $(NGINX_SG_ID)  --region $(AWS_REGION) --query 'Instances[0].InstanceId' --output text --associate-public-ip-address
 
-NGINX_INSTANCE_ID := i-0fd1227c6f0c40769
-NGINX_PUBLIC_IP := 3.83.245.246
-NGINX_PRIVATE_IP := 10.0.1.200
+NGINX_INSTANCE_ID := i-0c937835f489aa5fc
+NGINX_PUBLIC_IP := 44.204.119.96
+NGINX_PRIVATE_IP := 10.0.1.102
 
 run-nginx:
-	@ ssh -i $(KEY_PAIR_FILE) $(user)@$(NGINX_PUBLIC_IP) "sudo apt update -y && sudo apt install -y docker.io git && git clone https://github.com/Taif71/kubernetes_exam_1.git && cd kubernetes_exam_1 && cd nginx && sudo docker build -t nginx . && sudo docker run -p 80:80 nginx"
+	@ ssh -i $(KEY_PAIR_FILE) $(user)@$(NGINX_PUBLIC_IP) "sudo apt update -y && sudo apt install -y docker.io git && git clone https://github.com/Taif71/kube_make.git && cd kube_make && cd nginx && sudo docker build -t nginx . && sudo docker run -p 80:80 nginx"
 
 ##1. Create VPC, Subnet, IGW, Route Table, 
 ##2. Create 4 Instances under the same VPC
