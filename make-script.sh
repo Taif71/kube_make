@@ -82,18 +82,18 @@ create_ec2_nodes() {
     echo "Nodes are initializing....."
    
     MASTER_NODE_INSTANCE_ID=$(echo "$MASTER_NODE_INSTANCE" | grep -o '"InstanceId": *"[^"]*' | awk -F'"' '{print $4}')
-    MASTER_NODE_INSTANCE_PRIVATE_IP=$(echo "$MASTER_NODE_INSTANCE" | grep -o '"PrivateIpAddress": *"[^"]*' | awk -F'"' '{print $4}')
+    MASTER_NODE_INSTANCE_PRIVATE_IP=$(echo "$MASTER_NODE_INSTANCE" | grep -m 1 -o '"PrivateIpAddress": *"[^"]*' | awk -F'"' '{print $4}')
     aws ec2 wait instance-running --instance-ids "$MASTER_NODE_INSTANCE_ID"
     MASTER_NODE_INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids "$MASTER_NODE_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
   
     WORKER_NODE_1_INSTANCE_ID=$(echo "$WORKER_NODE_1_INSTANCE" | grep -o '"InstanceId": *"[^"]*' | awk -F'"' '{print $4}')
-    WORKER_NODE_1_PRIVATE_IP=$(echo "$WORKER_NODE_1_INSTANCE" | grep -o '"PrivateIpAddress": *"[^"]*' | awk -F'"' '{print $4}')
+    WORKER_NODE_1_PRIVATE_IP=$(echo "$WORKER_NODE_1_INSTANCE" | grep -m 1 -o '"PrivateIpAddress": *"[^"]*' | awk -F'"' '{print $4}')
     aws ec2 wait instance-running --instance-ids "$WORKER_NODE_1_INSTANCE_ID"
     WORKER_NODE_1_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids "$WORKER_NODE_1_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
 
   
     WORKER_NODE_2_INSTANCE_ID=$(echo "$WORKER_NODE_2_INSTANCE" | grep -o '"InstanceId": *"[^"]*' | awk -F'"' '{print $4}')
-    WORKER_NODE_2_PRIVATE_IP=$(echo "$WORKER_NODE_2_INSTANCE" | grep -o '"PrivateIpAddress": *"[^"]*' | awk -F'"' '{print $4}')
+    WORKER_NODE_2_PRIVATE_IP=$(echo "$WORKER_NODE_2_INSTANCE" | grep -m 1 -o '"PrivateIpAddress": *"[^"]*' | awk -F'"' '{print $4}')
     aws ec2 wait instance-running --instance-ids "$WORKER_NODE_2_INSTANCE_ID"
     WORKER_NODE_2_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids "$WORKER_NODE_2_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
 
@@ -130,7 +130,7 @@ create_nginx_node() {
     echo "NGINX is initializing....."
     NGINX_INSTANCE=$(aws ec2 run-instances --image-id "$AMI_ID" --count 1 --instance-type "$INSTANCE_TYPE" --key-name "$KEY_NAME" --subnet-id "$PUBLIC_SUBNET_ID" --security-group-ids "$NGINX_SECURITY_GROUP_ID" --region "$AWS_REGION" --query 'Instances[0]' --output json --associate-public-ip-address --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$NGINX_INSTANCE_NAME}]")
     NGINX_INSTANCE_ID=$(echo "$NGINX_INSTANCE" | grep -o '"InstanceId": *"[^"]*' | awk -F'"' '{print $4}')
-    NGINX_INSTANCE_PRIVATE_IP=$(echo "$NGINX_INSTANCE" | grep -o '"PrivateIpAddress": *"[^"]*' | awk -F'"' '{print $4}')
+    NGINX_INSTANCE_PRIVATE_IP=$(echo "$NGINX_INSTANCE" | grep -m 1 -o '"PrivateIpAddress": *"[^"]*' | awk -F'"' '{print $4}')
     aws ec2 wait instance-running --instance-ids "$NGINX_INSTANCE_ID"
     NGINX_INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids "$NGINX_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
 
@@ -145,11 +145,12 @@ setup_kube_master() {
     ssh -i "$KEY_PAIR_FILE" "$USER@$MASTER_NODE_INSTANCE_PUBLIC_IP" 'sudo hostnamectl set-hostname kube-master && sudo apt update && sudo curl -sfL https://get.k3s.io | sh - && sudo apt update'
 }
 
-K3S_URL="https://$MASTER_NODE_INSTANCE_PRIVATE_IP:6443"
+K3S_URL=""
 K3S_TOKEN=""
 
 get_master_token() {
-    K3S_TOKEN=$(ssh -i "$KEY_PAIR_FILE" "$user@$MASTER_NODE_INSTANCE_PUBLIC_IP" 'sudo cat /var/lib/rancher/k3s/server/node-token')
+    K3S_URL=https://$MASTER_NODE_INSTANCE_PRIVATE_IP:6443
+    K3S_TOKEN=$(ssh -i "$KEY_PAIR_FILE" "$USER@$MASTER_NODE_INSTANCE_PUBLIC_IP" "sudo cat /var/lib/rancher/k3s/server/node-token")
     echo "K3S URL: $K3S_URL"
     echo "K3S Token: $K3S_TOKEN"
 }
@@ -167,12 +168,6 @@ run_nginx_server() {
     ssh -i "$KEY_PAIR_FILE" "$user@$NGINX_PUBLIC_IP" 'sudo apt update -y && sudo apt install -y docker.io git && git clone https://github.com/Taif71/kube_make.git && cd kube_make && cd nginx && sudo docker build -t nginx . && sudo docker run -p 80:80 nginx'
 }
 
-# Other functions for creating resources (IGW, Route Table, Security Groups, etc.)
-
-
-# detach-delete-igw:
-
-
 # Deployment Steps
 main() {
     # Execute the functions in sequence
@@ -188,7 +183,7 @@ main() {
     get_master_token
     setup_kube_workers
     deploy_pods
-    # run_nginx_server
+    run_nginx_server
 }
 
 # Run the deployment
