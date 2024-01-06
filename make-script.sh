@@ -1,7 +1,4 @@
 #!/bin/sh
-
-# Set your variables here
-# ...
 AWS_REGION=us-east-1
 VPC_NAME='poridhi vpc'
 VPC_CIDR='10.0.0.0/16'
@@ -19,7 +16,6 @@ IGW_ID=""
 
 create_and_attach_igw() {
     IGW_OUTPUT=$(aws ec2 create-internet-gateway --region "$AWS_REGION" --query 'InternetGateway.{InternetGatewayId:InternetGatewayId}' --output text --tag-specifications "ResourceType=internet-gateway,Tags=[{Key=Name,Value='$IGW_NAME'}]")
-    # Store the VPC ID by removing trailing whitespace or newline characters
     IGW_ID=$(echo "$IGW_OUTPUT" | tr -d '\r\n')
     aws ec2 attach-internet-gateway --vpc-id "$VPC_ID" --internet-gateway-id "$IGW_ID" --region "$AWS_REGION"
 }
@@ -28,7 +24,6 @@ ROUTE_TABLE_ID=""
 ROUTE_TABLE_DESTINATION="0.0.0.0/0"
 create_and_update_route_table() {
     ROUTE_TABLE_ID=$(aws ec2 describe-route-tables --region "$AWS_REGION" --filters Name=vpc-id,Values="$VPC_ID" --query 'RouteTables[0].RouteTableId' --output text)
-    # ROUTE_TABLE_ID=$(aws ec2 create-route-table --vpc-id your-vpc-id --region your-region --query 'RouteTable.{RouteTableId:RouteTableId}' --output text)
     aws ec2 create-route --route-table-id "$ROUTE_TABLE_ID" --destination-cidr-block "$ROUTE_TABLE_DESTINATION" --gateway-id "$IGW_ID" --region "$AWS_REGION"
 }
 
@@ -52,7 +47,7 @@ create_and_config_security_group_nodes() {
 }
 
 
-INSTANCE_TYPE=t2.micro
+INSTANCE_TYPE=t2.medium
 AMI_ID=ami-0c7217cdde317cfec  # Replace with your desired AMI ID
 KEY_NAME=aws_login_1  # Replace with your key pair name
 
@@ -161,11 +156,37 @@ setup_kube_workers() {
 }
 
 deploy_pods() {
-    ssh -i "$KEY_PAIR_FILE" "$USER@$MASTER_NODE_INSTANCE_PUBLIC_IP" 'sudo apt install git && git clone https://github.com/shajalahamedcse/fireops.git && cd fireops && cd svc1 && cd deployment && sudo kubectl apply -f deployment.yml'
+    ssh -i "$KEY_PAIR_FILE" "$USER@$MASTER_NODE_INSTANCE_PUBLIC_IP" 'sudo apt install git && git clone https://github.com/Taif71/master_fireops.git && cd master_fireops && cd svc1 && cd deployment && sudo kubectl apply -f deployment.yml'
+    ssh -i "$KEY_PAIR_FILE" "$USER@$MASTER_NODE_INSTANCE_PUBLIC_IP" 'cd master_fireops && cd svc2 && cd deployment && sudo kubectl apply -f deployment.yml'
 }
 
-run_nginx_server() {
-    ssh -i "$KEY_PAIR_FILE" "$user@$NGINX_PUBLIC_IP" 'sudo apt update -y && sudo apt install -y docker.io git && git clone https://github.com/Taif71/kube_make.git && cd kube_make && cd nginx && sudo docker build -t nginx . && sudo docker run -p 80:80 nginx'
+setup_nginx_server() {
+    ssh -i "$KEY_PAIR_FILE" "$USER@$NGINX_INSTANCE_PUBLIC_IP" 'sudo hostnamectl set-hostname nginx && sudo apt update -y && sudo apt install -y docker.io git'
+}
+
+update_run_nginx() {
+    # Define the path to the nginx.conf file
+    NGINX_CONF_FILE="/home/meem/Desktop/poridhi_k8s_exam/nginx/nginx.conf"
+    NGINX_CONF_FOLDER="/home/meem/Desktop/poridhi_k8s_exam/nginx"
+
+    # Define the new server IPs
+    NEW_FR_PORIDHI_IP_1="server $WORKER_NODE_1_PRIVATE_IP:30000 max_fails=2 fail_timeout=30s;"
+    NEW_FR_PORIDHI_IP_2="server $WORKER_NODE_1_PRIVATE_IP:30001 max_fails=2 fail_timeout=30s;"
+    NEW_API_PORIDHI_IP_1="server $WORKER_NODE_2_PRIVATE_IP:30000 max_fails=2 fail_timeout=30s;"
+    NEW_API_PORIDHI_IP_2="server $WORKER_NODE_2_PRIVATE_IP:30001 max_fails=2 fail_timeout=30s;"
+
+    echo "Server fr.poridhi-1:  $NEW_FR_PORIDHI_IP_1"
+    echo "Server fr.poridhi-2:  $NEW_FR_PORIDHI_IP_2"
+    echo "Server api.poridhi-1:  $NEW_API_PORIDHI_IP_1"
+    echo "Server api.poridhi-2:  $NEW_API_PORIDHI_IP_2"
+    
+    sed -i "/upstream fr_poridhi {/a $NEW_FR_PORIDHI_IP_1" "$NGINX_CONF_FILE"
+    sed -i "/upstream fr_poridhi {/a $NEW_FR_PORIDHI_IP_2" "$NGINX_CONF_FILE"
+    sed -i "/upstream api_poridhi {/a $NEW_API_PORIDHI_IP_1" "$NGINX_CONF_FILE"
+    sed -i "/upstream api_poridhi {/a $NEW_API_PORIDHI_IP_2" "$NGINX_CONF_FILE"
+
+    scp -i "$KEY_PAIR_FILE" -r "$NGINX_CONF_FOLDER" "$USER@$NGINX_INSTANCE_PUBLIC_IP":~
+    ssh -i "$KEY_PAIR_FILE" "$USER@$NGINX_INSTANCE_PUBLIC_IP" 'cd nginx && sudo docker build -t nginx . && sudo docker run -p 80:80 nginx'
 }
 
 # Deployment Steps
@@ -183,25 +204,9 @@ main() {
     get_master_token
     setup_kube_workers
     deploy_pods
-    run_nginx_server
+    setup_nginx_server
+    update_run_nginx
 }
 
 # Run the deployment
 main "$@"
-
-
-
-
-
-
-
-
-
-
-#### DELETION OF PROVISION
-#1. delete ec2
-#2. delete security groups
-#3. Detach IGW
-#2. Delete IGW
-#3. Delete VPC - Route table get auto deleted
-#4. Delete subnet
