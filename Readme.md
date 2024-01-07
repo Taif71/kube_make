@@ -4,10 +4,6 @@
 
 - linux commands, shell script, makefile, aws-ec2
 
-<!-- ## Modules
-
-- [EventModule](/EventModule.md) -->
-
 ## Developer instructions
 
 - To run the project  you must first install aws cli. type aws configure and setup aws cli for your machine
@@ -47,4 +43,11 @@ At the bottom of the script we find a main() function and the main getting execu
 - create_ec2_nodes: this method creates 3 nodes: master, worker-1,worker-2 and attaches the security group that we created.
 - create_and_config_nginx_security_group: This method creates and configures security group for the instance
 - create_nginx_node: This method creates the ec2 instance node for the nginx
--
+- setup_kube_master: this method installs k3s inside master node
+- get_master_token: we get the token of master via this method to connect master with the workers
+- setup_kube_workers: We ensure that the kubernetes workers are properly confugured with their master. To do this, this method uses K3S_URL and K3S token that we just got
+- deploy_pods: finally, this method ssh into master and pulls the required repo and deploys the pods to their servers
+- setup_nginx_server: we want nginx to load balance the traffic to the pods
+- update_run_nginx: this method writes/updates the nginx.conf file locally, then copies the folder nginx to our nginx-server and finally builds it in an image
+
+And there, our automated deployment for a k3s cluster has been deployed and all done via makefile and shell script with just one command "make automate".
